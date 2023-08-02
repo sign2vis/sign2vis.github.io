@@ -1,0 +1,51 @@
+It needs about 6 minutes for processing the benchmark datasets
+build db-table-column-distinctValue dictionary  start ... ...
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+error.
+db error:  .DS_Store
+build db-table-column-distinctValue dictionary  end ... ...
+process the benchmark dataset for training&testing  start ... ...
+0.0
+83.06
+test.csvsave
+process the benchmark dataset for training&testing  end ... ...

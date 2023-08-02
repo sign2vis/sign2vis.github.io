@@ -1,4 +1,5 @@
 import os, sys, argparse, re, json
+import pandas as pd
 
 from matplotlib.pylab import *
 import torch.nn as nn
@@ -11,23 +12,29 @@ import random as python_random
 import bert.tokenization as tokenization
 from bert.modeling import BertConfig, BertModel
 
-from sign2sql.utils.utils_sign2sql import *
-from sign2sql.models.slt import *
-from utils.metrics import bleu, chrf, rouge
+from sign2vis.utils.utils_sign2vis import *
+from sign2vis.model.slt import *
+from sign2vis.utils.metrics import bleu, chrf, rouge
+
+import time
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def construct_hyper_param(parser):
+    parser.add_argument('-data_dir', required=False, default='./ncNet/dataset/my_last_data_final/',
+                        help='Path to dataset for building vocab')
+    parser.add_argument('-with_temp', required=False, default=1,
+                        help='Which template to use, 0:empty, 1:fill, 2:all')
+    
     parser.add_argument("--do_train", default=False, action='store_true')
     parser.add_argument('--do_infer', default=False, action='store_true')
     parser.add_argument('--infer_loop', default=False, action='store_true')
 
     parser.add_argument("--trained", default=False, action='store_true')
 
-    parser.add_argument('--tepoch', default=200, type=int)
-    parser.add_argument("--bS", default=32, type=int,
-                        help="Batch size")
+    parser.add_argument('--tepoch', default=50, type=int)
+    parser.add_argument('--batch_size', default=2, type=int)
     parser.add_argument("--accumulate_gradients", default=1, type=int,
                         help="The number of accumulation of backpropagation to effectivly increase the batch size.")
     # parser.add_argument('--fine_tune',
@@ -63,16 +70,6 @@ def construct_hyper_param(parser):
     parser.add_argument('--dr', default=0.1, type=float, help="Dropout rate.")
     parser.add_argument('--lr', default=1e-4, type=float, help="Learning rate.")
     parser.add_argument("--hS", default=256, type=int, help="The dimension of hidden vector in the SLTModel.")
-
-    # # 1.4 Execution-guided decoding beam-size. It is used only in test.py
-    # parser.add_argument('--EG',
-    #                     default=False,
-    #                     action='store_true',
-    #                     help="If present, Execution guided decoding is used in test.")
-    # parser.add_argument('--beam_size',
-    #                     type=int,
-    #                     default=4,
-    #                     help="The size of beam for smart decoding")
 
     args = parser.parse_args()
 
@@ -133,7 +130,7 @@ def get_opt(model):
 
 
 def get_models(args, BERT_PT_PATH, trained=False, path_model=None):
-    print(f"Batch_size = {args.bS * args.accumulate_gradients}")
+    print(f"Batch_size = {args.batch_size * args.accumulate_gradients}")
     print(f"BERT parameters:")
     print(f"learning rate: {args.lr_bert}")
     print(f"Fine-tune BERT: False")
@@ -142,13 +139,15 @@ def get_models(args, BERT_PT_PATH, trained=False, path_model=None):
                                                   args.no_pretraining)
 
     # Get SLT model
-    model = SLTModel(model_bert.embeddings, args.hS, args.lr, args.lS)
+    # model = SLTModel(model_bert.embeddings, args.hS, args.lr, args.lS)
+    model = SLTModel(model_bert.embeddings, args.hS, args.dr, args.lS)
     model = model.to(device)
 
     if trained:
         assert path_model != None
 
         if torch.cuda.is_available():
+            print(f"load model's checkpoint")
             res = torch.load(path_model)
         else:
             res = torch.load(path_model, map_location='cpu')
@@ -157,12 +156,52 @@ def get_models(args, BERT_PT_PATH, trained=False, path_model=None):
     
     return model, tokenizer
 
+def get_data(sign_path, args):
+    data = []
+    csv_path = args.data_dir
+    bS = args.batch_size
+    with_temp = args.with_temp
+    print(len(os.listdir(sign_path)))
+    for each in ['train.csv', 'dev.csv']:
+            # print(each)
+            df = pd.read_csv(os.path.join(csv_path, each))
+            now_data = []
+            for index, row in df.iterrows():
+                id = row['tvBench_id']
+                que = row['question']
+                src = row['source']
+                trg = row['labels']
+                tok_types = row['token_types']
+                video_path = os.path.join(sign_path, id + '.npy')
+                if with_temp == 0 and src.find('[T]') == -1:
+                    continue
+                elif with_temp == 1 and src.find('[T]') != -1:
+                    continue
+                if not os.path.exists(video_path):
+                    print(id, que)
+                    continue
 
-def get_data(path_sign2text, args):
-    train_data, dev_data, table = load_sign2text(path_sign2text)
-    train_loader, dev_loader = get_loader_sign2text(train_data, dev_data, args.bS, shuffle_train=True)
-    
-    return train_data, dev_data, table, train_loader, dev_loader
+                # if id in ['888@x_name@ASC', '888@x_name@DESC', '2417@x_name@ASC', '2417@x_name@DESC', '2417@y_name@DESC', '895@x_name@DESC', '888@y_name@ASC', '888@y_name@DESC', '2417@y_name@ASC']:
+                #     video = np.load(video_path)
+                #     if video.shape[0] == 0:
+                #         print(id, que)    
+
+                now_data.append({'id':id,
+                                 'question':que,
+                                 'src':src,
+                                 'trg':trg,
+                                 'tok_types':tok_types,
+                                 'video_path':video_path
+                })
+                # print(que)
+            data.append(now_data)
+
+    train_data, dev_data = data
+    # train_data = train_data[::16]
+    # dev_data = dev_data[::16]
+    # print(len(train_data), len(dev_data))
+    train_loader, dev_loader = get_loader_sign2text(train_data, dev_data, bS, shuffle_train=True)
+    return train_data, dev_data, train_loader, dev_loader
 
 
 def train(train_loader, model, opt, tokenizer, 
@@ -173,6 +212,7 @@ def train(train_loader, model, opt, tokenizer,
     cnt = 0  # count the # of examples
 
     for iB, t in enumerate(train_loader):
+        # print(iB)
         cnt += len(t)
 
         if cnt < st_pos:
@@ -285,6 +325,11 @@ def save_text_pred_dev(save_root, all_text_pred, dname):
         for text in all_text_pred:
             f.write(text+'\n')
 
+def epoch_time(start_time, end_time):
+    elapsed_time = end_time - start_time
+    elapsed_mins = int(elapsed_time / 60)
+    elapsed_secs = int(elapsed_time - (elapsed_mins * 60))
+    return elapsed_mins, elapsed_secs
 
 if __name__ == '__main__':
     ## 1. Hyper parameters
@@ -292,23 +337,25 @@ if __name__ == '__main__':
     args = construct_hyper_param(parser)
 
     ## 2. Paths
-    BERT_PT_PATH = '/mnt/gold/zsj/data/sign2sql/model/annotated_wikisql_and_PyTorch_bert_param'
-    path_sign2text = '/mnt/gold/zsj/data/sign2sql/dataset'
+    BERT_PT_PATH = '/mnt/silver/zsj/data/sign2sql/model/annotated_wikisql_and_PyTorch_bert_param'
+    path_sign2text = '/mnt/silver/guest/zgb/Sign2Vis/new_npy_data'
 
-    path_save_for_evaluation = '/mnt/gold/zsj/data/sign2sql/model/sign2text_save'
+    # path_save_for_evaluation = '/mnt/silver/zsj/data/sign2sql/model/sign2text_save'
+    path_save_for_evaluation = './sign2text_save'
     if not os.path.exists(path_save_for_evaluation):
         os.mkdir(path_save_for_evaluation)
     
     ## 3. Load data
 
-    train_data, dev_data, table, train_loader, dev_loader = get_data(path_sign2text, args)
+    train_data, dev_data, train_loader, dev_loader = get_data(path_sign2text, args)
 
+    print(f"len(train_data)={len(train_data)}, len(dev_data)={len(dev_data)}")
     ## 4. Build & Load models
     if not args.trained:
         model, tokenizer = get_models(args, BERT_PT_PATH)
     else:
         # To start from the pre-trained models, un-comment following lines.
-        path_model = os.path.join(path_save_for_evaluation, 'model_best.pt')
+        path_model = os.path.join(path_save_for_evaluation, 'slt_model_best.pt')
         model, tokenizer = get_models(args, BERT_PT_PATH, 
                                       trained=True, path_model=path_model)
 
@@ -320,6 +367,9 @@ if __name__ == '__main__':
         ROUGE_best = -1
         epoch_best = -1
         for epoch in range(args.tepoch):
+            print(f'epoch {epoch} start')
+            start_time = time.time()
+
             # train
             acc_train, aux_out_train = train(train_loader,
                                              model,
@@ -335,10 +385,15 @@ if __name__ == '__main__':
                                                   tokenizer,
                                                   st_pos=0,
                                                   beam_size=5)
+            
+            end_time = time.time()
+            
+            epoch_mins, epoch_secs = epoch_time(start_time, end_time)
 
             print_result(epoch, acc_train, 'train')
             print_result(epoch, results, 'dev')
             
+            print(f'Time: {epoch_mins}m {epoch_secs}s')
             # save pred text on dev
             save_text_pred_dev(path_save_for_evaluation, all_text_pred_dev, 'all_text_pred_dev.txt')
 
@@ -350,7 +405,16 @@ if __name__ == '__main__':
                 epoch_best = epoch
                 # save best model
                 state = {'model': model.state_dict()}
-                torch.save(state, os.path.join(path_save_for_evaluation, 'model_best.pt'))
+                torch.save(state, os.path.join(path_save_for_evaluation, 'new_slt_model_best.pt'))
             
             print(f" Best Dev ROUGE score: {ROUGE_best} at epoch: {epoch_best}")
-
+    else:
+        with torch.no_grad():
+            results, all_text_pred_dev = test(dev_loader,
+                                                  model,
+                                                  tokenizer,
+                                                  st_pos=0,
+                                                  beam_size=5)
+            print_result(0, results, 'dev')
+            # save pred text on dev
+            save_text_pred_dev(path_save_for_evaluation, all_text_pred_dev, 'all_text_pred_dev_2.txt')
