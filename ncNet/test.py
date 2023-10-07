@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 
 from model.VisAwareTranslation import translate_sentence, translate_sentence_with_guidance, postprocessing, get_all_table_columns
-from model.Model import Seq2Seq_wo
+from model.Model import Seq2Seq
 from model.Encoder import Encoder
 from model.Decoder import Decoder
 from preprocessing.build_vocab import build_vocab
@@ -138,7 +138,7 @@ def exe_acc(db_id, pred, gold):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='test.py')
 
-    parser.add_argument('-model', required=False, default='D:/fwq/MySign2Vis/last_model_best_wo.pt',
+    parser.add_argument('-model', required=False, default='./save_models/last_model_best_wo.pt',
                         help='Path to model weight file')
     parser.add_argument('-data_dir', required=False, default='./dataset/my_last_data_final/',
                         help='Path to dataset for building vocab')
@@ -215,7 +215,7 @@ if __name__ == "__main__":
     TRG_PAD_IDX = TRG.vocab.stoi[TRG.pad_token]
 
     print("------------------------------\n| Build the ncNet structure... | \n------------------------------")
-    ncNet = Seq2Seq_wo(enc, dec, SRC, SRC_PAD_IDX, TRG_PAD_IDX, device).to(device)  # define the transformer-based ncNet
+    ncNet = Seq2Seq(enc, dec, SRC, SRC_PAD_IDX, TRG_PAD_IDX, device).to(device)  # define the transformer-based ncNet
 
     print("------------------------------\n| Load the trained ncNet ... | \n------------------------------")
     ncNet.load_state_dict(torch.load(opt.model, map_location=device))
@@ -237,6 +237,19 @@ if __name__ == "__main__":
     nl_template_cnt = 0
     nl_template_match = 0
     template_exe_match = 0
+
+    cnt_e = 0
+    cnt_m = 0
+    cnt_h = 0
+    cnt_eh = 0
+    match_e = 0
+    match_m = 0
+    match_h = 0
+    match_eh = 0
+    exe_e = 0
+    exe_m = 0
+    exe_h = 0
+    exe_eh = 0
 
     cnt_b = 0
     cnt_p = 0
@@ -261,7 +274,16 @@ if __name__ == "__main__":
     match_gs = 0
 
     test_df = pd.read_csv(opt.test_data)
-    
+
+    res_e = []
+    res_m = []
+    res_h = []
+    res_eh = []
+    res_e_trg = []
+    res_m_trg = []
+    res_h_trg = []
+    res_eh_trg = []
+
     res_wo = []
     res_wi = []
     res_all = []
@@ -291,20 +313,18 @@ if __name__ == "__main__":
         wo = False
 
         chart = row['chart']
+        hardness = row['hardness']
         gold_query = row['labels'].lower()
 
         # if ' '.join(gold_query.replace('"', "'").split()) != 'mark bar data employees encoding x first_name y aggregate mean salary transform filter first_name like \'%m\' group x sort x asc':
         #     continue
 
-        src = row['source'].lower()
-        if src == '<n> pie chart showing the total number of employees from different denominations. </n> <c> mark arc data [d] encoding x [x] y aggregate [aggfunction] [y] color [z] transform filter [f] group [g] sort [s] topk [k] bin [b] </c> <d> company <col> </col> <val> </val> </d>':
-            opt.show_progress = True
-        else:
-            continue
+        src = row['source']
+
         # i_list = src.split(' ')
         # i_list[i_list.index('<C>') + 4] = '[D]'
         # src = ' '.join(i_list).lower()
-
+        src = src.lower()
         # print(src)
 
         tok_types = row['token_types']
@@ -332,9 +352,9 @@ if __name__ == "__main__":
         pred_query = ' '.join(translation).replace(' <eos>', '').lower()
         old_pred_query = pred_query
 
-        p_list = pred_query.split(' ')
-        p_list[p_list.index('data') + 1] = table_name
-        pred_query = ' '.join(p_list)
+        # p_list = pred_query.split(' ')
+        # p_list[p_list.index('data') + 1] = table_name
+        # pred_query = ' '.join(p_list)
 
         # print(pred_query)
         # print(gold_query)
@@ -352,6 +372,23 @@ if __name__ == "__main__":
             res_wi_trg.append(' '.join(gold_query.replace('"', "'").split()))
             res_all.append(' '.join(pred_query.replace('"', "'").split()))
 
+            if hardness == 'Easy':
+                cnt_e += 1
+                res_e.append(' '.join(pred_query.replace('"', "'").split()))
+                res_e_trg.append(' '.join(gold_query.replace('"', "'").split()))
+            elif hardness == 'Medium':
+                cnt_m += 1
+                res_m.append(' '.join(pred_query.replace('"', "'").split()))
+                res_m_trg.append(' '.join(gold_query.replace('"', "'").split()))
+            elif hardness == 'Hard':
+                cnt_h += 1
+                res_h.append(' '.join(pred_query.replace('"', "'").split()))
+                res_h_trg.append(' '.join(gold_query.replace('"', "'").split()))
+            else:
+                cnt_eh += 1
+                res_eh.append(' '.join(pred_query.replace('"', "'").split()))
+                res_eh_trg.append(' '.join(gold_query.replace('"', "'").split()))  
+            
             if chart == 'Bar':
                 cnt_b += 1
                 res_b.append(' '.join(pred_query.replace('"', "'").split()))
@@ -383,6 +420,15 @@ if __name__ == "__main__":
             
             if ' '.join(gold_query.replace('"', "'").split()) == ' '.join(pred_query.replace('"', "'").split()):
                 nl_template_match += 1
+                if hardness == 'Easy':
+                    match_e += 1
+                elif hardness == 'Medium':
+                    match_m += 1
+                elif hardness == 'Hard':
+                    match_h += 1
+                else:
+                    match_eh += 1
+
                 if chart == 'Bar':
                     match_b += 1
                 elif chart == 'Pie':
@@ -407,6 +453,15 @@ if __name__ == "__main__":
             if exe_acc_res:
                 wi = True
                 template_exe_match += 1
+                if hardness == 'Easy':
+                    exe_e += 1
+                elif hardness == 'Medium':
+                    exe_m += 1
+                elif hardness == 'Hard':
+                    exe_h += 1
+                else:
+                    exe_eh += 1
+                
                 if chart == 'Bar':
                     exe_b += 1
                 elif chart == 'Pie':
@@ -520,12 +575,40 @@ if __name__ == "__main__":
     print(results_all)
 
     results = dict()
+    bleus = bleu(references=res_e_trg, hypotheses=res_e)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_e_trg, hypotheses=res_e)
+    print(results)
+    print('easy:', match_e / cnt_e)
+    print('easy:', exe_e / cnt_e)
+
+    bleus = bleu(references=res_m_trg, hypotheses=res_m)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_m_trg, hypotheses=res_m)
+    print(results)
+    print('medium:', match_m / cnt_m)
+    print('medium:', exe_m / cnt_m)
+
+    bleus = bleu(references=res_h_trg, hypotheses=res_h)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_h_trg, hypotheses=res_h)
+    print(results)
+    print('hard:', match_h / cnt_h)
+    print('hard:', exe_h / cnt_h)
+
+    bleus = bleu(references=res_eh_trg, hypotheses=res_eh)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_eh_trg, hypotheses=res_eh)
+    print(results)
+    print('e hard:', match_eh / cnt_eh)
+    print('e hard:', exe_eh / cnt_eh)
+    
     bleus = bleu(references=res_b_trg, hypotheses=res_b)
     results['bleu4'] = bleus['bleu4']
     results['rouge'] = rouge(references=res_b_trg, hypotheses=res_b)
     print(results)
-    print('Bar:', match_b / cnt_b)
-    print('Bar:', exe_b / cnt_b)
+    print('Bar:', (match_sb + match_b) / (cnt_sb + cnt_b))
+    print('Bar:', (exe_sb + exe_b) / (cnt_sb + cnt_b))
 
     bleus = bleu(references=res_p_trg, hypotheses=res_p)
     results['bleu4'] = bleus['bleu4']
@@ -538,15 +621,15 @@ if __name__ == "__main__":
     results['bleu4'] = bleus['bleu4']
     results['rouge'] = rouge(references=res_l_trg, hypotheses=res_l)
     print(results)
-    print('Line:', match_l / cnt_l)
-    print('Line:', exe_l / cnt_l)
+    print('Line:', (match_gl + match_l) / (cnt_gl + cnt_l))
+    print('Line:', (exe_gl + exe_l) / (cnt_gl + cnt_l))
 
     bleus = bleu(references=res_s_trg, hypotheses=res_s)
     results['bleu4'] = bleus['bleu4']
     results['rouge'] = rouge(references=res_s_trg, hypotheses=res_s)
     print(results)
-    print('Scatter:', match_s / cnt_s)
-    print('Scatter:', exe_s / cnt_s)
+    print('Scatter:', (match_gs + match_s) / (cnt_gs + cnt_s))
+    print('Scatter:', (exe_gs + exe_s) / (cnt_gs + cnt_s))
 
     bleus = bleu(references=res_sb_trg, hypotheses=res_sb)
     results['bleu4'] = bleus['bleu4']
@@ -581,10 +664,10 @@ if __name__ == "__main__":
     #     for x in res_wi_trg:
     #         f.write(x + '\n')
     
-    with open('./test_res/wi.jsonl', 'w', encoding='utf-8') as f:
+    with open('./test_res/wi_no.jsonl', 'w', encoding='utf-8') as f:
         for x in wi_jsonl:
             f.write(json.dumps(x) + '\n')
 
-    with open('./test_res/wo.jsonl', 'w', encoding='utf-8') as f:
+    with open('./test_res/wo_no.jsonl', 'w', encoding='utf-8') as f:
         for x in wo_jsonl:
             f.write(json.dumps(x) + '\n')

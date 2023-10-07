@@ -61,8 +61,8 @@ def get_data(sign_path, args):
 
 
     train_data, dev_data = data
-    # train_data = train_data[::100]
-    # dev_data = dev_data[::100]
+    # train_data = train_data[::16]
+    # dev_data = dev_data[::16]
     print(len(train_data), len(dev_data))
     train_loader, dev_loader = get_loader_sign2text(train_data, dev_data, bS, shuffle_train=True)
     return train_data, dev_data, train_loader, dev_loader
@@ -188,9 +188,9 @@ def epoch_time(start_time, end_time):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', required=False, default='./ncNet/dataset/my_last_data_final/',
+    parser.add_argument('--data_dir', required=False, default='./ncNet/dataset/my_new_last_data_final/',
                         help='Path to dataset for building vocab')
-    parser.add_argument('--with_temp', type=int, required=False, default=1,
+    parser.add_argument('--with_temp', type=int, required=False, default=2,
                         help='Which template to use, 0:empty, 1:fill, 2:all')
     parser.add_argument('--db_info', required=False, default='./ncNet/dataset/database_information.csv',
                         help='Path to database tables/columns information, for building vocab')
@@ -235,9 +235,10 @@ if __name__ == '__main__':
     torch.backends.cudnn.deterministic = True
 
     BERT_PT_PATH = '/mnt/silver/zsj/data/sign2sql/model/annotated_wikisql_and_PyTorch_bert_param'
-    SLT_PT_PATH = '/mnt/silver/guest/zgb/Sign2Vis/sign2text_save/new_slt_model_best.pt'
-    NC_PT_PATH = '/mnt/silver/guest/zgb/Sign2Vis/ncNet/save_models/model_best.pt'
-    path_sign2text = '/mnt/silver/guest/zgb/Sign2Vis/new_npy_data'
+    SLT_PT_PATH = '/mnt/silver/guest/zgb/MySign2Vis/sign2text_save/new_slt_model_best.pt'
+    NC_PT_PATH = '/mnt/silver/guest/zgb/MySign2Vis/ncNet/save_models/model_best.pt'
+    S2V_PT_PATH = '/mnt/silver/guest/zgb/MySign2Vis/sign2vis_v2_save/s2v_all_model_best.pt'
+    path_sign2text = '/mnt/silver/guest/zgb/MySign2Vis/new_npy_data'
     
     print("------------------------------\n| Build vocab start ... | \n------------------------------")
     SRC, TRG, TOK_TYPES, my_max_length =  build_vocab_only(
@@ -302,15 +303,25 @@ if __name__ == '__main__':
     model_slt.load_state_dict(res['model'])
 
     print("------------------------------\n| Build the sign2vis model... | \n------------------------------")
-    model_s2v = Sign2vis_ts_Model(model_slt, enc, dec, INPUT_DIM, SRC, SRC_PAD_IDX, TRG_PAD_IDX, HID_DIM, device, args.dr_enc)
+    model_s2v = Sign2vis_Model(model_slt, enc, dec, INPUT_DIM, SRC, SRC_PAD_IDX, TRG_PAD_IDX, HID_DIM, device, args.dr_enc)
     model_s2v = model_s2v.to(device)
-    # if args.trained:
-    #     if torch.cuda.is_available():
-    #         res = torch.load(NC_PT_PATH)
-    #     else:
-    #         res = torch.load(NC_PT_PATH, map_location='cpu')
-    #         model_s2v.load_state_dict(res)
-    #     print('load pretrained s2v')
+    if args.trained:
+        if torch.cuda.is_available():
+            res = torch.load(S2V_PT_PATH)
+        else:
+            res = torch.load(S2V_PT_PATH, map_location='cpu')
+        model_s2v.load_state_dict(res)
+        
+        # encoder_dict = model_s2v.encoder.state_dict()
+        # pretrained_encoder_dict = {k: v for k, v in res.items() if k in encoder_dict}
+        # encoder_dict.update(pretrained_encoder_dict)
+        # model_s2v.encoder.load_state_dict(encoder_dict)
+
+        # decoder_dict = model_s2v.decoder.state_dict()
+        # pretrained_decoder_dict = {k: v for k, v in res.items() if k in decoder_dict}
+        # decoder_dict.update(pretrained_decoder_dict)
+        # model_s2v.decoder.load_state_dict(decoder_dict)
+        print('load pretrained s2v')
 
 
     print("------------------------------\n| Init for training ... | \n------------------------------")
@@ -348,7 +359,7 @@ if __name__ == '__main__':
         if valid_loss < best_valid_loss:
             print('△○△○△○△○△○△○△○△○\nSave the BEST model!\n△○△○△○△○△○△○△○△○△○')
             best_valid_loss = valid_loss
-            torch.save(model_s2v.state_dict(), args.output_dir + 's2v_ts_model_best.pt')
+            torch.save(model_s2v.state_dict(), args.output_dir + 's2v_all_model_best.pt')
 
         # # save model on each epoch
         # print('△○△○△○△○△○△○△○△○\nSave ncNet!\n△○△○△○△○△○△○△○△○△○')

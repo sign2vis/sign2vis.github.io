@@ -46,6 +46,13 @@ db error:  .DS_Store
 build db-table-column-distinctValue dictionary  end ... ...
 process the benchmark dataset for training&testing  start ... ...
 0.0
+17.83
+35.66
+53.5
+71.33
+89.16
+0.0
+83.19
+0.0
 83.06
-test.csvsave
 process the benchmark dataset for training&testing  end ... ...

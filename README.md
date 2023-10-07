@@ -1,4 +1,5 @@
-# SIGN2SQL: Towards SQL Query Generation from Sign Language
+# Sign2Vis: Automated Data Visualization from Sign Language
+
 ## Dataset information
 - Some samples in our dataset
 
@@ -32,7 +33,7 @@ We release the text2vis dataset in  `./text_refinement/s2v_data.jsonl.` The vide
 **Note： for executing the code, you may need to modify the input and output path in our code.**
 - convert the sign videos(mp4 format) in npy format
     ```shell
-    cd sign2sql/dataset
+    cd sign2vis/dataset
     python sign_preprocess.py
     ```
 
@@ -45,7 +46,7 @@ We release the text2vis dataset in  `./text_refinement/s2v_data.jsonl.` The vide
 ## Train
 - train the Sign2Text model（Transformer）
     ```shell
-    CUDA_VISIBLE_DEVICES=0 nohup python -u train_sign2text.py --do_train --seed 1 --bS 3 --accumulate_gradients 2 --bert_type_abb uS --lr 0.0001 > sign2text.log 2>&1 &
+    CUDA_VISIBLE_DEVICES=0 nohup python -u train_sign2text.py --do_train --seed 1 --bS 4 --accumulate_gradients 2 --bert_type_abb uS --lr 0.0001 > sign2text.log 2>&1 &
     ```
 
 - train the Text2VIS model（ncNet）
@@ -56,12 +57,12 @@ We release the text2vis dataset in  `./text_refinement/s2v_data.jsonl.` The vide
 
 - after finish the above model training，inference with above two models（Transformer+ncNet）
     ```shell
-    CUDA_VISIBLE_DEVICES=0 nohup python -u test_sign2text.py --seed 1 --bS 3 --bert_type_abb uS --trained > sign2text.log 2>&1 &
+    CUDA_VISIBLE_DEVICES=0 nohup python -u test_sign2text.py --seed 1 --bS 4 --bert_type_abb uS --trained > sign2text.log 2>&1 &
     cd ./ncNet
     CUDA_VISIBLE_DEVICES=0 nohup python -u test.py > test.log
     ```
 
-- train the end-to-end model（Sign2SQLNet）
+- train the end-to-end model（Sign2VisNet）
     ```shell
     CUDA_VISIBLE_DEVICES=0 nohup python -u train_sign2vis.py --with_temp 2 --batch_size 4 --accumulate_gradients 2 --bert_type_abb uS >> ./train_sign2vis.log 2>&1 &
     ```

@@ -128,7 +128,7 @@ def exe_acc(db_id, pred, gold):
             return False
     except:
         if pred_VQL == gold_VQL:
-            print(pred_VQL, gold_VQL)
+            # print(pred_VQL, gold_VQL)
             return True
         else:
             return False
@@ -138,7 +138,7 @@ def get_data(sign_path, args):
     bS = args.batch_size
     with_temp = args.with_temp
 
-    df = pd.read_csv(os.path.join(csv_path, 'test.csv'))
+    df = pd.read_csv(args.test_data)
     now_data = []
     for index, row in df.iterrows():
         id = row['tvBench_id']
@@ -240,14 +240,15 @@ def epoch_time(start_time, end_time):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', required=False, default='./ncNet/dataset/my_last_data_final/',
+    parser.add_argument('--data_dir', required=False, default='./ncNet/dataset/my_new_last_data_final/',
                         help='Path to dataset for building vocab')
-    parser.add_argument('--with_temp', type=int, required=False, default=2,
+    parser.add_argument('--with_temp', type=int, required=False, default=1,
                         help='Which template to use, 0:empty, 1:fill, 2:all')
     parser.add_argument('--db_info', required=False, default='./ncNet/dataset/database_information.csv',
                         help='Path to database tables/columns information, for building vocab')
     parser.add_argument('--output_dir', type=str, default='./sign2vis_v2_save/')
-
+    parser.add_argument('-test_data', required=False, default='/mnt/silver/guest/zgb/MySign2Vis/ncNet/dataset/my_new_last_data_final/test.csv',
+                        help='Path to testing dataset, formatting as csv')
     parser.add_argument('--epoch', type=int, default=100,
                         help='the number of epoch for training')
     parser.add_argument('--learning_rate', type=float, default=0.0005)
@@ -288,7 +289,7 @@ if __name__ == '__main__':
 
     BERT_PT_PATH = '/mnt/silver/zsj/data/sign2sql/model/annotated_wikisql_and_PyTorch_bert_param'
     SLT_PT_PATH = '/mnt/silver/guest/zgb/MySign2Vis/sign2text_save/new_slt_model_best.pt'
-    S2V_PT_PATH = '/mnt/silver/guest/zgb/MySign2Vis/sign2vis_v2_save/s2v_wo_model_best.pt'
+    S2V_PT_PATH = '/mnt/silver/guest/zgb/MySign2Vis/sign2vis_v2_save/s2v_ts1_wo_model_best.pt'
     path_sign2text = '/mnt/silver/guest/zgb/MySign2Vis/new_npy_data'
     
     print("------------------------------\n| Build vocab start ... | \n------------------------------")
@@ -314,7 +315,7 @@ if __name__ == '__main__':
     DEC_PF_DIM = 512
     ENC_DROPOUT = 0.1
     DEC_DROPOUT = 0.1
-
+    print(INPUT_DIM, OUTPUT_DIM)
     print("------------------------------\n| Build encoder of the text ... | \n------------------------------")
     enc = AllEncoder(INPUT_DIM,
                   HID_DIM,
@@ -356,7 +357,7 @@ if __name__ == '__main__':
     model_slt.load_state_dict(res['model'])
 
     print("------------------------------\n| Build the sign2vis model... | \n------------------------------")
-    model_s2v = Sign2vis_ts_Model(model_slt, enc, dec, INPUT_DIM, SRC, SRC_PAD_IDX, TRG_PAD_IDX, HID_DIM, device, args.dr_enc)
+    model_s2v = Sign2vis_Model(model_slt, enc, dec, INPUT_DIM, SRC, SRC_PAD_IDX, TRG_PAD_IDX, HID_DIM, device, args.dr_enc)
     model_s2v = model_s2v.to(device)
     if args.trained:
         if torch.cuda.is_available():
@@ -662,99 +663,106 @@ if __name__ == '__main__':
     # results_all['bleu4'] = bleus['bleu4']
     # results_all['chrf'] = chrf(references=res_all_trg, hypotheses=res_all)
     # results_all['rouge'] = rouge(references=res_all_trg, hypotheses=res_all)
-    print("========================================================")
-    print('ncNet w/o chart template:', only_nl_match / only_nl_cnt)
-    print('ncNet w/o chart template:', only_nl_exe / only_nl_cnt)
-    print(results_wo)
-    print('ncNet with chart template:', nl_template_match / nl_template_cnt)
-    print('ncNet with chart template:', nl_template_exe / nl_template_cnt)
-    print(results_wi)
+    # print("========================================================")
+    try:
+        print('ncNet w/o chart template:', only_nl_match / only_nl_cnt)
+        print('ncNet w/o chart template:', only_nl_exe / only_nl_cnt)
+        print(results_wo)
+    except:
+        pass
 
-    with open('./test_res/wi_s2v.jsonl', 'w', encoding='utf-8') as f:
+    try:
+        print('ncNet with chart template:', nl_template_match / nl_template_cnt)
+        print('ncNet with chart template:', nl_template_exe / nl_template_cnt)
+        print(results_wi)
+    except:
+        pass
+
+    with open('./wi_s2v_ts_1.jsonl', 'w', encoding='utf-8') as f:
         for x in wi_jsonl:
             f.write(json.dumps(x) + '\n')
 
-    with open('./test_res/wo_s2v.jsonl', 'w', encoding='utf-8') as f:
+    with open('./wo_s2v_ts_1.jsonl', 'w', encoding='utf-8') as f:
         for x in wo_jsonl:
             f.write(json.dumps(x) + '\n')
 
     # print('ncNet overall:', (only_nl_match + nl_template_match) / (only_nl_cnt + nl_template_cnt))
     # print(results_all)
     
-    # results = dict()
-    # bleus = bleu(references=res_e_trg, hypotheses=res_e)
-    # results['bleu4'] = bleus['bleu4']
-    # results['rouge'] = rouge(references=res_e_trg, hypotheses=res_e)
-    # print(results)
-    # print('easy:', match_e / cnt_e)
-    # print('easy:', exe_e / cnt_e)
+    results = dict()
+    bleus = bleu(references=res_e_trg, hypotheses=res_e)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_e_trg, hypotheses=res_e)
+    print(results)
+    print('easy:', match_e / cnt_e)
+    print('easy:', exe_e / cnt_e)
 
-    # bleus = bleu(references=res_m_trg, hypotheses=res_m)
-    # results['bleu4'] = bleus['bleu4']
-    # results['rouge'] = rouge(references=res_m_trg, hypotheses=res_m)
-    # print(results)
-    # print('medium:', match_m / cnt_m)
-    # print('medium:', exe_m / cnt_m)
+    bleus = bleu(references=res_m_trg, hypotheses=res_m)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_m_trg, hypotheses=res_m)
+    print(results)
+    print('medium:', match_m / cnt_m)
+    print('medium:', exe_m / cnt_m)
 
-    # bleus = bleu(references=res_h_trg, hypotheses=res_h)
-    # results['bleu4'] = bleus['bleu4']
-    # results['rouge'] = rouge(references=res_h_trg, hypotheses=res_h)
-    # print(results)
-    # print('hard:', match_h / cnt_h)
-    # print('hard:', exe_h / cnt_h)
+    bleus = bleu(references=res_h_trg, hypotheses=res_h)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_h_trg, hypotheses=res_h)
+    print(results)
+    print('hard:', match_h / cnt_h)
+    print('hard:', exe_h / cnt_h)
 
-    # bleus = bleu(references=res_eh_trg, hypotheses=res_eh)
-    # results['bleu4'] = bleus['bleu4']
-    # results['rouge'] = rouge(references=res_eh_trg, hypotheses=res_eh)
-    # print(results)
-    # print('e hard:', match_eh / cnt_eh)
-    # print('e hard:', exe_eh / cnt_eh)
+    bleus = bleu(references=res_eh_trg, hypotheses=res_eh)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_eh_trg, hypotheses=res_eh)
+    print(results)
+    print('e hard:', match_eh / cnt_eh)
+    print('e hard:', exe_eh / cnt_eh)
 
-    # bleus = bleu(references=res_b_trg, hypotheses=res_b)
-    # results['bleu4'] = bleus['bleu4']
-    # results['rouge'] = rouge(references=res_b_trg, hypotheses=res_b)
-    # print(results)
-    # print('Bar:', match_b / cnt_b)
-    # print('Bar:', exe_b / cnt_b)
+    bleus = bleu(references=res_b_trg, hypotheses=res_b)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_b_trg, hypotheses=res_b)
+    print(results)
+    print('Bar:', (match_sb + match_b) / (cnt_sb + cnt_b))
+    print('Bar:', (exe_sb + exe_b) / (cnt_sb + cnt_b))
 
-    # bleus = bleu(references=res_p_trg, hypotheses=res_p)
-    # results['bleu4'] = bleus['bleu4']
-    # results['rouge'] = rouge(references=res_p_trg, hypotheses=res_p)
-    # print(results)
-    # print('Pie:', match_p / cnt_p)
-    # print('Pie:', exe_p / cnt_p)
+    bleus = bleu(references=res_p_trg, hypotheses=res_p)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_p_trg, hypotheses=res_p)
+    print(results)
+    print('Pie:', match_p / cnt_p)
+    print('Pie:', exe_p / cnt_p)
 
-    # bleus = bleu(references=res_l_trg, hypotheses=res_l)
-    # results['bleu4'] = bleus['bleu4']
-    # results['rouge'] = rouge(references=res_l_trg, hypotheses=res_l)
-    # print(results)
-    # print('Line:', match_l / cnt_l)
-    # print('Line:', exe_l / cnt_l)
+    bleus = bleu(references=res_l_trg, hypotheses=res_l)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_l_trg, hypotheses=res_l)
+    print(results)
+    print('Line:', (match_gl + match_l) / (cnt_gl + cnt_l))
+    print('Line:', (exe_gl + exe_l) / (cnt_gl + cnt_l))
 
-    # bleus = bleu(references=res_s_trg, hypotheses=res_s)
-    # results['bleu4'] = bleus['bleu4']
-    # results['rouge'] = rouge(references=res_s_trg, hypotheses=res_s)
-    # print(results)
-    # print('Scatter:', match_s / cnt_s)
-    # print('Scatter:', exe_s / cnt_s)
+    bleus = bleu(references=res_s_trg, hypotheses=res_s)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_s_trg, hypotheses=res_s)
+    print(results)
+    print('Scatter:', (match_gs + match_s) / (cnt_gs + cnt_s))
+    print('Scatter:', (exe_gs + exe_s) / (cnt_gs + cnt_s))
 
-    # bleus = bleu(references=res_sb_trg, hypotheses=res_sb)
-    # results['bleu4'] = bleus['bleu4']
-    # results['rouge'] = rouge(references=res_sb_trg, hypotheses=res_sb)
-    # print(results)
-    # print('Stacked Bar:', match_sb / cnt_sb)
-    # print('Stacked Bar:', exe_sb / cnt_sb)
+    bleus = bleu(references=res_sb_trg, hypotheses=res_sb)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_sb_trg, hypotheses=res_sb)
+    print(results)
+    print('Stacked Bar:', match_sb / cnt_sb)
+    print('Stacked Bar:', exe_sb / cnt_sb)
 
-    # bleus = bleu(references=res_gl_trg, hypotheses=res_gl)
-    # results['bleu4'] = bleus['bleu4']
-    # results['rouge'] = rouge(references=res_gl_trg, hypotheses=res_gl)
-    # print(results)
-    # print('Grouping Line:', match_gl / cnt_gl)
-    # print('Grouping Line:', exe_gl / cnt_gl)
+    bleus = bleu(references=res_gl_trg, hypotheses=res_gl)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_gl_trg, hypotheses=res_gl)
+    print(results)
+    print('Grouping Line:', match_gl / cnt_gl)
+    print('Grouping Line:', exe_gl / cnt_gl)
 
-    # bleus = bleu(references=res_gs_trg, hypotheses=res_gs)
-    # results['bleu4'] = bleus['bleu4']
-    # results['rouge'] = rouge(references=res_gs_trg, hypotheses=res_gs)
-    # print(results)
-    # print('Grouping Scatter:', match_gs / cnt_gs)
-    # print('Grouping Scatter:', exe_gs / cnt_gs)
+    bleus = bleu(references=res_gs_trg, hypotheses=res_gs)
+    results['bleu4'] = bleus['bleu4']
+    results['rouge'] = rouge(references=res_gs_trg, hypotheses=res_gs)
+    print(results)
+    print('Grouping Scatter:', match_gs / cnt_gs)
+    print('Grouping Scatter:', exe_gs / cnt_gs)

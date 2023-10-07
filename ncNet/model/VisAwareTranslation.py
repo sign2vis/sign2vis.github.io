@@ -1,5 +1,3 @@
-__author__ = "Yuyu Luo"
-
 import re
 import json
 
@@ -55,7 +53,7 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
     '''
     # candidate columns mentioned by the NL query
     # candidate_columns = get_candidate_columns(input_source)
-    candidate_columns = []
+    # candidate_columns = []
 
     best_token = topk_tokens[0]
     best_id = topk_ids[0]
@@ -64,10 +62,9 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
         mark_type = get_chart_type(pred_tokens_list)
 
         if best_token not in table_columns and '(' not in best_token:
-            print(input_source)
             is_in_topk = False
             for tok in topk_tokens:
-                if tok in candidate_columns and tok in table_columns:
+                if tok in table_columns:
                     # get column's type
                     if mark_type in ['bar', 'line'] and db_tables_columns_types!=None and db_tables_columns_types[db_id][table_id][tok] != 'numeric':
                         best_token = tok
@@ -85,8 +82,8 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
                         is_in_topk = True
                         break
 
-            if is_in_topk == False and len(candidate_columns) > 0:
-                for col in candidate_columns:
+            if is_in_topk == False:
+                for col in table_columns:
                     if col != '':
                         if mark_type in ['bar', 'line'] and db_tables_columns_types != None and db_tables_columns_types[db_id][table_id][col] != 'numeric':
                             best_token = col
@@ -113,7 +110,7 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
         if y not in table_columns and y != 'distinct':
             is_in_topk = False
             for tok in topk_tokens:
-                if tok in candidate_columns and tok in table_columns:
+                if tok in table_columns:
                     if mark_type in ['bar', 'arc', 'line'] and agg_function == 'count':
                         best_token = tok
                         best_id = trg_field.vocab.stoi[best_token]
@@ -130,8 +127,8 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
                         best_id = trg_field.vocab.stoi[best_token]
                         break
 
-            if is_in_topk == False and len(candidate_columns) > 0:
-                for col in candidate_columns:
+            if is_in_topk == False:
+                for col in table_columns:
                     if col != '':
                         if mark_type in ['bar', 'arc', 'line'] and agg_function == 'count':
                             best_token = col
@@ -148,15 +145,6 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
                             best_id = trg_field.vocab.stoi[best_token]
                             break
 
-        # TODO!
-        # print(candidate_columns)
-        if (y in table_columns and y not in candidate_columns) and ('(' not in y):
-            for tok in topk_tokens:
-                if tok in candidate_columns and tok in table_columns:
-                    best_token = tok
-                    best_id = trg_field.vocab.stoi[best_token]
-                    is_in_topk = True
-                    break
 
     if current_token_type == 'z_axis':
         selected_x = get_x(pred_tokens_list)
@@ -165,7 +153,7 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
         if best_token not in table_columns or best_token == selected_x or best_token == selected_y:
             is_in_topk = False
             for tok in topk_tokens:
-                if tok in candidate_columns and tok in table_columns:
+                if tok in table_columns:
                     # get column's type
                     if selected_x != tok and selected_y != tok and db_tables_columns_types !=None and db_tables_columns_types[db_id][table_id][tok] == 'categorical':
                         best_token = tok
@@ -173,8 +161,8 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
                         is_in_topk = True
                         break
 
-            if is_in_topk == False and len(candidate_columns) > 0:
-                for col in candidate_columns:
+            if is_in_topk == False:
+                for col in table_columns:
                     if col != selected_x and col != selected_y and db_tables_columns_types!=None and db_tables_columns_types[db_id][table_id][
                         col] == 'categorical':
                         best_token = col
@@ -184,7 +172,7 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
         if selected_x == best_token or selected_y == best_token or db_tables_columns_types != None and db_tables_columns_types[db_id][table_id][
             best_token] != 'categorical':
             for tok in topk_tokens:
-                if tok in candidate_columns and tok in table_columns:
+                if tok in table_columns:
                     # get column's type
                     if selected_x != tok and selected_y != tok and db_tables_columns_types != None and db_tables_columns_types[db_id][table_id][
                         tok] == 'categorical':
@@ -208,7 +196,7 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
             if best_token not in table_columns or db_tables_columns_types != None and db_tables_columns_types[db_id][table_id][best_token] == 'numeric':
                 is_in_topk = False
                 for tok in topk_tokens:
-                    if tok in candidate_columns and tok in table_columns:
+                    if tok in table_columns:
                         # get column's type
                         if db_tables_columns_types != None and db_tables_columns_types[db_id][table_id][tok] == 'categorical':
                             best_token = tok
@@ -368,6 +356,7 @@ def translate_sentence_with_guidance(db_id, table_id, sentence, src_field, trg_f
 
             pred_token = table_id.split(' ')
             pred_id = [trg_field.vocab.stoi[x] for x in pred_token]
+
             # pred_token = '[d]'
             # pred_id = trg_field.vocab.stoi['[d]']
 
@@ -386,8 +375,6 @@ def translate_sentence_with_guidance(db_id, table_id, sentence, src_field, trg_f
                 db_id, table_id, trg_field, sentence, table_columns, db_tables_columns_types, topk_ids,
                 topk_tokens, current_token_type, trg_tokens
             )
-            # if pred_id != topk_ids[0]:
-            #     print(sentence)
             if show_progress == True:
                 if current_token_type == None:
                     print('-------------------\nCurrent Token Type: Query Sketch Part , top-3 tokens: [{}]'.format(', '.join(topk_tokens)))
@@ -627,99 +614,99 @@ def postprocessing_group(gold_q_tok, pred_q_tok):
 
 
 def postprocessing(gold_query, pred_query, if_template, src_input):
-    try:
-        # get the template:
-        chart_template = re.findall('<c>.*</c>', src_input)[0]
-        chart_template_tok = chart_template.lower().split(' ')
+    # get the template:
+    # print(src_input)
+    chart_template = re.findall('<c>.*</c>', src_input)[0]
+    chart_template_tok = chart_template.lower().split(' ')
 
-        gold_q_tok = gold_query.lower().split(' ')
-        pred_q_tok = pred_query.lower().split(' ')
+    gold_q_tok = gold_query.lower().split(' ')
+    pred_q_tok = pred_query.lower().split(' ')
 
-        # 0. visualize type. if we have the template, the visualization type must be matched.
-        if if_template:
-            pred_q_tok[pred_q_tok.index('mark') + 1] = gold_q_tok[gold_q_tok.index('mark') + 1]
 
-        # 1. Table Checking. If we focus on single table, must match!!!
-        if 'data' in pred_q_tok and 'data' in gold_q_tok:
-            if 'encoding' in pred_q_tok:
-                pred_q_tok_l = []
-                pred_q_tok_r = []
+    # 0. visualize type. if we have the template, the visualization type must be matched.
+    if if_template:
+        pred_q_tok[pred_q_tok.index('mark') + 1] = gold_q_tok[gold_q_tok.index('mark') + 1]
 
-                for i,x in enumerate(pred_q_tok):
-                    if i <= pred_q_tok.index('data'):
-                        pred_q_tok_l.append(x)
-                    elif i >= pred_q_tok.index('encoding'):
-                        pred_q_tok_r.append(x)
-                    else:
-                        pass
-                
-                table_list = gold_q_tok[gold_q_tok.index('data') + 1:gold_q_tok.index('encoding')]
-                pred_q_tok = pred_q_tok_l + table_list + pred_q_tok_r
-                # print(pred_q_tok_l, table_list, pred_q_tok_r)
-                # print(pred_q_tok)
+    # 1. Table Checking. If we focus on single table, must match!!!
+    if 'data' in pred_q_tok and 'data' in gold_q_tok:
+        if 'encoding' in pred_q_tok:
+            pred_q_tok_l = []
+            pred_q_tok_r = []
 
-        pred_q_tok = postprocessing_group(gold_q_tok, pred_q_tok)
+            for i,x in enumerate(pred_q_tok):
+                if i <= pred_q_tok.index('data'):
+                    pred_q_tok_l.append(x)
+                elif i >= pred_q_tok.index('encoding'):
+                    pred_q_tok_r.append(x)
+                else:
+                    pass
+            
+            table_list = gold_q_tok[gold_q_tok.index('data') + 1:gold_q_tok.index('encoding')]
+            pred_q_tok = pred_q_tok_l + table_list + pred_q_tok_r
+            # print(pred_q_tok_l, table_list, pred_q_tok_r)
+            # print(pred_q_tok)
 
-        # 3. Order-by. if we have the template, we can checking (and correct) the predicting order-by
-        # rule 1: if have the template, order by [x]/[y], trust to the select [x]/[y]
-        if 'sort' in gold_q_tok and 'sort' in pred_q_tok and if_template:
-            order_by_which_axis = chart_template_tok[chart_template_tok.index('sort') + 1]  # [x], [y], or [o]
-            if order_by_which_axis == '[x]':
-                pred_q_tok[pred_q_tok.index('sort') + 1] = 'x'
-            elif order_by_which_axis == '[y]':
-                pred_q_tok[pred_q_tok.index('sort') + 1] = 'y'
-            else:
-                pass
+    pred_q_tok = postprocessing_group(gold_q_tok, pred_q_tok)
 
-        elif 'sort' in gold_q_tok and 'sort' not in pred_q_tok and if_template:
-            order_by_which_axis = chart_template_tok[chart_template_tok.index('sort') + 1]  # [x], [y], or [o]
-            order_type = chart_template_tok[chart_template_tok.index('sort') + 2]
-
-            if 'x' == gold_q_tok[gold_q_tok.index('sort') + 1] or 'y' == gold_q_tok[gold_q_tok.index('sort') + 1]:
-                pred_q_tok += ['sort', gold_q_tok[gold_q_tok.index('sort') + 1]]
-                if gold_q_tok.index('sort') + 2 < len(gold_q_tok):
-                    pred_q_tok += [gold_q_tok[gold_q_tok.index('sort') + 2]]
-            else:
-                pass
-
+    # 3. Order-by. if we have the template, we can checking (and correct) the predicting order-by
+    # rule 1: if have the template, order by [x]/[y], trust to the select [x]/[y]
+    if 'sort' in gold_q_tok and 'sort' in pred_q_tok and if_template:
+        order_by_which_axis = chart_template_tok[chart_template_tok.index('sort') + 1]  # [x], [y], or [o]
+        if order_by_which_axis == '[x]':
+            pred_q_tok[pred_q_tok.index('sort') + 1] = 'x'
+        elif order_by_which_axis == '[y]':
+            pred_q_tok[pred_q_tok.index('sort') + 1] = 'y'
         else:
             pass
 
-        pred_q_tok = postprocessing_group(gold_q_tok, pred_q_tok)
+    elif 'sort' in gold_q_tok and 'sort' not in pred_q_tok and if_template:
+        order_by_which_axis = chart_template_tok[chart_template_tok.index('sort') + 1]  # [x], [y], or [o]
+        order_type = chart_template_tok[chart_template_tok.index('sort') + 2]
 
-        # 4. checking (and correct) bining
-        # rule 1: [interval] bin
-        # rule 2: bin by [x]
-        if 'bin' in gold_q_tok and 'bin' in pred_q_tok:
-            # rule 1
-            if_bin_gold, if_bin_pred = False, False
+        if 'x' == gold_q_tok[gold_q_tok.index('sort') + 1] or 'y' == gold_q_tok[gold_q_tok.index('sort') + 1]:
+            pred_q_tok += ['sort', gold_q_tok[gold_q_tok.index('sort') + 1]]
+            if gold_q_tok.index('sort') + 2 < len(gold_q_tok):
+                pred_q_tok += [gold_q_tok[gold_q_tok.index('sort') + 2]]
+        else:
+            pass
 
-            for binn in ['by time', 'by year', 'by weekday', 'by month']:
-                if binn in gold_query:
-                    if_bin_gold = binn
-                if binn in pred_query:
-                    if_bin_pred = binn
+    else:
+        pass
 
-            if (if_bin_gold != False and if_bin_pred != False) and (if_bin_gold != if_bin_pred):
-                pred_q_tok[pred_q_tok.index('bin') + 3] = if_bin_gold.replace('by ', '')
+    pred_q_tok = postprocessing_group(gold_q_tok, pred_q_tok)
 
-        if 'bin' in gold_q_tok and 'bin' not in pred_q_tok and 'group' in pred_q_tok:
-            # rule 3: group-by x and bin x by time in the bar chart should be the same.
-            bin_x = gold_q_tok[gold_q_tok.index('bin') + 1]
-            group_x = pred_q_tok[pred_q_tok.index('group') + 1]
-            if bin_x == group_x:
-                if ''.join(pred_q_tok).replace('group ' + group_x, '') == ''.join(gold_q_tok).replace(
-                        'bin ' + bin_x + ' by time', ''):
-                    pred_q_tok = gold_q_tok
+    # 4. checking (and correct) bining
+    # rule 1: [interval] bin
+    # rule 2: bin by [x]
+    if 'bin' in gold_q_tok and 'bin' in pred_q_tok:
+        # rule 1
+        if_bin_gold, if_bin_pred = False, False
 
-        # group x | bin x ... count A == count B
-        if 'count' in gold_q_tok and 'count' in pred_q_tok:
-            if ('group' in gold_q_tok and 'group' in pred_q_tok) or ('bin' in gold_q_tok and 'bin' in pred_q_tok):
-                pred_count = pred_q_tok[pred_q_tok.index('count') + 1]
-                gold_count = gold_q_tok[gold_q_tok.index('count') + 1]
-                if ' '.join(pred_q_tok).replace('count ' + pred_count, 'count ' + gold_count) == ' '.join(gold_q_tok):
-                    pred_q_tok = gold_q_tok
+        for binn in ['by time', 'by year', 'by weekday', 'by month']:
+            if binn in gold_query:
+                if_bin_gold = binn
+            if binn in pred_query:
+                if_bin_pred = binn
 
-    except:
-        print('error at post processing')
+        if (if_bin_gold != False and if_bin_pred != False) and (if_bin_gold != if_bin_pred):
+            pred_q_tok[pred_q_tok.index('bin') + 3] = if_bin_gold.replace('by ', '')
+
+    if 'bin' in gold_q_tok and 'bin' not in pred_q_tok and 'group' in pred_q_tok:
+        # rule 3: group-by x and bin x by time in the bar chart should be the same.
+        bin_x = gold_q_tok[gold_q_tok.index('bin') + 1]
+        group_x = pred_q_tok[pred_q_tok.index('group') + 1]
+        if bin_x == group_x:
+            if ''.join(pred_q_tok).replace('group ' + group_x, '') == ''.join(gold_q_tok).replace(
+                    'bin ' + bin_x + ' by time', ''):
+                pred_q_tok = gold_q_tok
+
+    # group x | bin x ... count A == count B
+    if 'count' in gold_q_tok and 'count' in pred_q_tok:
+        if ('group' in gold_q_tok and 'group' in pred_q_tok) or ('bin' in gold_q_tok and 'bin' in pred_q_tok):
+            pred_count = pred_q_tok[pred_q_tok.index('count') + 1]
+            gold_count = gold_q_tok[gold_q_tok.index('count') + 1]
+            if ' '.join(pred_q_tok).replace('count ' + pred_count, 'count ' + gold_count) == ' '.join(gold_q_tok):
+                pred_q_tok = gold_q_tok
+
+
     return ' '.join(pred_q_tok)

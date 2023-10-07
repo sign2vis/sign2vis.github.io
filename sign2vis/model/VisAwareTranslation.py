@@ -1,5 +1,3 @@
-__author__ = "Yuyu Luo"
-
 import re
 import json
 
@@ -53,8 +51,6 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
     current_token_type = x|y|groupby-axis|bin x|  if_template:[orderby-axis, order-type, chart_type]
     pred_tokens_list: the predicted tokens list
     '''
-    # candidate columns mentioned by the NL query
-    candidate_columns = get_candidate_columns(input_source)
 
     best_token = topk_tokens[0]
     best_id = topk_ids[0]
@@ -65,7 +61,7 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
         if best_token not in table_columns and '(' not in best_token:
             is_in_topk = False
             for tok in topk_tokens:
-                if tok in candidate_columns and tok in table_columns:
+                if tok in table_columns:
                     # get column's type
                     if mark_type in ['bar', 'line'] and db_tables_columns_types!=None and db_tables_columns_types[db_id][table_id][tok] != 'numeric':
                         best_token = tok
@@ -83,8 +79,8 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
                         is_in_topk = True
                         break
 
-            if is_in_topk == False and len(candidate_columns) > 0:
-                for col in candidate_columns:
+            if is_in_topk == False:
+                for col in table_columns:
                     if col != '':
                         if mark_type in ['bar', 'line'] and db_tables_columns_types != None and db_tables_columns_types[db_id][table_id][col] != 'numeric':
                             best_token = col
@@ -107,10 +103,11 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
 
         y = best_token
 
+
         if y not in table_columns and y != 'distinct':
             is_in_topk = False
             for tok in topk_tokens:
-                if tok in candidate_columns and tok in table_columns:
+                if tok in table_columns:
                     if mark_type in ['bar', 'arc', 'line'] and agg_function == 'count':
                         best_token = tok
                         best_id = trg_field.vocab.stoi[best_token]
@@ -127,8 +124,8 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
                         best_id = trg_field.vocab.stoi[best_token]
                         break
 
-            if is_in_topk == False and len(candidate_columns) > 0:
-                for col in candidate_columns:
+            if is_in_topk == False:
+                for col in table_columns:
                     if col != '':
                         if mark_type in ['bar', 'arc', 'line'] and agg_function == 'count':
                             best_token = col
@@ -145,14 +142,6 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
                             best_id = trg_field.vocab.stoi[best_token]
                             break
 
-        # TODO!
-        if (y in table_columns and y not in candidate_columns) and ('(' not in y):
-            for tok in topk_tokens:
-                if tok in candidate_columns and tok in table_columns:
-                    best_token = tok
-                    best_id = trg_field.vocab.stoi[best_token]
-                    is_in_topk = True
-                    break
 
     if current_token_type == 'z_axis':
         selected_x = get_x(pred_tokens_list)
@@ -161,7 +150,7 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
         if best_token not in table_columns or best_token == selected_x or best_token == selected_y:
             is_in_topk = False
             for tok in topk_tokens:
-                if tok in candidate_columns and tok in table_columns:
+                if tok in table_columns:
                     # get column's type
                     if selected_x != tok and selected_y != tok and db_tables_columns_types !=None and db_tables_columns_types[db_id][table_id][tok] == 'categorical':
                         best_token = tok
@@ -169,8 +158,8 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
                         is_in_topk = True
                         break
 
-            if is_in_topk == False and len(candidate_columns) > 0:
-                for col in candidate_columns:
+            if is_in_topk == False:
+                for col in table_columns:
                     if col != selected_x and col != selected_y and db_tables_columns_types!=None and db_tables_columns_types[db_id][table_id][
                         col] == 'categorical':
                         best_token = col
@@ -180,7 +169,7 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
         if selected_x == best_token or selected_y == best_token or db_tables_columns_types != None and db_tables_columns_types[db_id][table_id][
             best_token] != 'categorical':
             for tok in topk_tokens:
-                if tok in candidate_columns and tok in table_columns:
+                if tok in table_columns:
                     # get column's type
                     if selected_x != tok and selected_y != tok and db_tables_columns_types != None and db_tables_columns_types[db_id][table_id][
                         tok] == 'categorical':
@@ -204,7 +193,7 @@ def guide_decoder_by_candidates(db_id, table_id, trg_field, input_source, table_
             if best_token not in table_columns or db_tables_columns_types != None and db_tables_columns_types[db_id][table_id][best_token] == 'numeric':
                 is_in_topk = False
                 for tok in topk_tokens:
-                    if tok in candidate_columns and tok in table_columns:
+                    if tok in table_columns:
                         # get column's type
                         if db_tables_columns_types != None and db_tables_columns_types[db_id][table_id][tok] == 'categorical':
                             best_token = tok
@@ -478,10 +467,10 @@ def translate_s2v(enc_src, src_mask, db_id, table_id, sentence, trg_field, model
         else:
             topk_ids = torch.topk(output, k=5, dim=2, sorted=True).indices[:, -1, :].tolist()[0]
             topk_tokens = [trg_field.vocab.itos[tok_id] for tok_id in topk_ids]
-
-            '''
-            apply guide_decoder_by_candidates
-            '''
+            # pred_id, pred_token = topk_ids[0], topk_tokens[0]
+            # '''
+            # apply guide_decoder_by_candidates
+            # '''
             pred_id, pred_token = guide_decoder_by_candidates(
                 db_id, table_id, trg_field, sentence, table_columns, db_tables_columns_types, topk_ids,
                 topk_tokens, current_token_type, trg_tokens

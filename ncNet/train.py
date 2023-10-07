@@ -8,7 +8,7 @@ This script handles the training process.
 import torch
 import torch.nn as nn
 
-from model.Model import Seq2Seq_wo
+from model.Model import Seq2Seq
 from model.Encoder import Encoder
 from model.Decoder import Decoder
 from preprocessing.build_vocab import build_vocab
@@ -110,7 +110,7 @@ def epoch_time(start_time, end_time):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='train.py')
 
-    parser.add_argument('-data_dir', required=False, default='./dataset/last_data_final/',
+    parser.add_argument('-data_dir', required=False, default='./dataset/my_last_data_final/',
                         help='Path to dataset for building vocab')
     parser.add_argument('-db_info', required=False, default='./dataset/database_information.csv',
                         help='Path to database tables/columns information, for building vocab')
@@ -186,7 +186,7 @@ if __name__ == '__main__':
     TRG_PAD_IDX = TRG.vocab.stoi[TRG.pad_token]
 
     print("------------------------------\n| Build the ncNet structure... | \n------------------------------")
-    ncNet = Seq2Seq_wo(enc, dec, SRC, SRC_PAD_IDX, TRG_PAD_IDX, device).to(device) # define the transformer-based ncNet
+    ncNet = Seq2Seq(enc, dec, SRC, SRC_PAD_IDX, TRG_PAD_IDX, device).to(device) # define the transformer-based ncNet
 
     print("------------------------------\n| Init for training ... | \n------------------------------")
     ncNet.apply(initialize_weights)
@@ -221,7 +221,7 @@ if __name__ == '__main__':
         if valid_loss < best_valid_loss:
             print('△○△○△○△○△○△○△○△○\nSave the BEST model!\n△○△○△○△○△○△○△○△○△○')
             best_valid_loss = valid_loss
-            torch.save(ncNet.state_dict(), opt.output_dir + 'last_model_best_no_table.pt')
+            torch.save(ncNet.state_dict(), opt.output_dir + 'sign2text_model_best.pt')
 
         # # save model on each epoch
         # print('△○△○△○△○△○△○△○△○\nSave ncNet!\n△○△○△○△○△○△○△○△○△○')

@@ -132,9 +132,9 @@ class ProcessData4Training(object):
         NL_tokens += two_grams
         NL_tokens += three_grams
 
-        A = pd.DataFrame(data=NL_tokens, columns=['name']).astype(str)
+        A = pd.DataFrame(data=NL_tokens, columns=['name'])
         A['id'] = list(range(len(A)))
-        C = pd.DataFrame(data=columns_list, columns=['name']).astype(str)
+        C = pd.DataFrame(data=columns_list, columns=['name'])
         C['id'] = list(range(len(C)))
         cand_col = ssj.edit_distance_join(
             A, C, 'id', 'id', 'name', 'name', 2, l_out_attrs=['name'], r_out_attrs=['name'], show_progress=False
@@ -152,7 +152,7 @@ class ProcessData4Training(object):
         for k, v in values.items():
             for each_v in v:
                 B_value.append([k, each_v])
-        B = pd.DataFrame(data=B_value, columns=['col', 'name']).astype(str)
+        B = pd.DataFrame(data=B_value, columns=['col', 'name'])
         B['id'] = list(range(len(B)))
         output_pairs = ssj.edit_distance_join(
             A, B, 'id', 'id', 'name', 'name', 2, l_out_attrs=['name'], r_out_attrs=['name', 'col'], show_progress=False
@@ -176,7 +176,7 @@ class ProcessData4Training(object):
         order = {by: x|y, type: desc|asc}
         '''
 
-        query_template = 'mark [T] data [D] encoding x [X] y aggregate [AggFunction] [Y] color [Z] transform filter [F] group [G] sort [S] topk [K] bin [B]'
+        query_template = 'mark [T] data [D] encoding x [X] y aggregate [AggFunction] [Y] color [Z] transform filter [F] group [G] bin [B] sort [S] topk [K]'
         query_chart_template = query_template
 
         query_list = query.lower().split(' ')
@@ -254,7 +254,7 @@ class ProcessData4Training(object):
     def process4training(self):
         # process for template
         for each in ['train.csv', 'dev.csv', 'test.csv']:
-            df = pd.read_csv('../dataset/my_last_data/' + each)
+            df = pd.read_csv('./dataset/' + each)
             data = list()
 
             for index, row in df.iterrows():
@@ -320,150 +320,8 @@ class ProcessData4Training(object):
             df_template = pd.DataFrame(data=data, columns=list(df.columns) + ['mentioned_columns', 'mentioned_values',
                                                                               'query_template', 'source', 'labels',
                                                                               'token_types'])
-            df_template.to_csv('../dataset/my_last_data_final/' + each, index=False)
-            print(each + 'save')
+            df_template.to_csv('../dataset/dataset_final/' + each, index=False)
 
-    def process_test(self):
-        # process for template
-        for each in ['test.csv']:
-            df = pd.read_csv('../dataset/sign2text_data/' + each)
-            data = list()
-
-            for index, row in df.iterrows():
-
-                if str(row['question']) != 'nan':
-
-                    new_row1 = list(row)
-                    new_row2 = list(row)
-
-                    query_list = row['vega_zero'].lower().split(' ')
-
-                    st_id = query_list.index('data') + 1
-                    ed_id = None
-                    for j in range(len(query_list) - st_id):
-                        if query_list[st_id + j] == 'encoding':
-                            ed_id = st_id + j
-                    table_name = ' '.join(query_list[st_id:ed_id])
-
-                    query_template, query_chart_template = self.fill_in_query_template_by_chart_template(row['vega_zero'])
-
-                    # get a list of mentioned values in the NL question
-
-                    col_names, value_names = self.get_mentioned_values_in_NL_question(
-                        row['db_id'], table_name, row['question'], db_table_col_val_map=finding_map
-                    )
-                    col_names = ' '.join(str(e) for e in col_names)
-                    value_names = ' '.join(str(e) for e in value_names)
-                    new_row1.append(col_names)
-                    new_row1.append(value_names)
-                    new_row2.append(col_names)
-                    new_row2.append(value_names)
-
-                    new_row1.append(query_template)
-                    new_row2.append(query_chart_template)
-
-                    input_source1 = '<N> ' + row[
-                        'question'] + ' </N>' + ' <C> ' + query_template + ' </C> ' + '<D> ' + table_name + ' <COL> ' + col_names + ' </COL>' + ' <VAL> ' + value_names + ' </VAL> </D>'
-                    input_source1 = ' '.join(input_source1.split())  # Replace multiple spaces with single space
-
-                    input_source2 = '<N> ' + row[
-                        'question'] + ' </N>' + ' <C> ' + query_chart_template + ' </C> ' + '<D> ' + table_name + ' <COL> ' + col_names + ' </COL>' + ' <VAL> ' + value_names + ' </VAL> </D>'
-                    input_source2 = ' '.join(input_source2.split())  # Replace multiple spaces with single space
-
-                    new_row1.append(input_source1)
-                    new_row1.append(row['vega_zero'])
-
-                    new_row2.append(input_source2)
-                    new_row2.append(row['vega_zero'])
-
-                    token_types1 = self.get_token_types(input_source1)
-                    token_types2 = self.get_token_types(input_source2)
-                    new_row1.append(token_types1)
-                    new_row2.append(token_types2)
-
-                    data.append(new_row1)
-                    data.append(new_row2)
-                else:
-                    print('nan at ', index)
-
-                if index % 500 == 0:
-                    print(round(index / len(df) * 100, 2))
-
-            df_template = pd.DataFrame(data=data, columns=list(df.columns) + ['mentioned_columns', 'mentioned_values',
-                                                                              'query_template', 'source', 'labels',
-                                                                              'token_types'])
-            df_template.to_csv('../dataset/sign2text_data_final/' + each, index=False)
-            print(each + 'save')
-
-    def process3training(self):
-        # process for template
-        for each in ['train.csv', 'dev.csv', 'test.csv']:
-            df = pd.read_csv('../dataset/my_last_data/' + each)
-            data = list()
-
-            for index, row in df.iterrows():
-
-                if str(row['question']) != 'nan':
-
-                    new_row1 = list(row)
-                    new_row2 = list(row)
-
-                    query_list = row['vega_zero'].lower().split(' ')
-
-                    st_id = query_list.index('data') + 1
-                    ed_id = None
-                    for j in range(len(query_list) - st_id):
-                        if query_list[st_id + j] == 'encoding':
-                            ed_id = st_id + j
-                    table_name = ' '.join(query_list[st_id:ed_id])
-
-                    query_template, query_chart_template = self.fill_in_query_template_by_chart_template(row['vega_zero'])
-
-                    # get a list of mentioned values in the NL question
-
-                    col_names = list(finding_map[row['db_id']][table_name].keys())
-                    col_names = ' '.join(str(e) for e in col_names)
-                    value_names = ' '
-                    new_row1.append(col_names)
-                    new_row1.append(value_names)
-                    new_row2.append(col_names)
-                    new_row2.append(value_names)
-
-                    new_row1.append(query_template)
-                    new_row2.append(query_chart_template)
-
-                    input_source1 = '<N> ' + row[
-                        'question'] + ' </N>' + ' <C> ' + query_template + ' </C> ' + '<D> ' + table_name + ' <COL> ' + col_names + ' </COL>' + ' <VAL> ' + value_names + ' </VAL> </D>'
-                    input_source1 = ' '.join(input_source1.split())  # Replace multiple spaces with single space
-
-                    input_source2 = '<N> ' + row[
-                        'question'] + ' </N>' + ' <C> ' + query_chart_template + ' </C> ' + '<D> ' + table_name + ' <COL> ' + col_names + ' </COL>' + ' <VAL> ' + value_names + ' </VAL> </D>'
-                    input_source2 = ' '.join(input_source2.split())  # Replace multiple spaces with single space
-
-                    new_row1.append(input_source1)
-                    new_row1.append(row['vega_zero'])
-
-                    new_row2.append(input_source2)
-                    new_row2.append(row['vega_zero'])
-
-                    token_types1 = self.get_token_types(input_source1)
-                    token_types2 = self.get_token_types(input_source2)
-                    new_row1.append(token_types1)
-                    new_row2.append(token_types2)
-
-                    data.append(new_row1)
-                    data.append(new_row2)
-                else:
-                    print('nan at ', index)
-
-                if index % 500 == 0:
-                    print(round(index / len(df) * 100, 2))
-
-            df_template = pd.DataFrame(data=data, columns=list(df.columns) + ['mentioned_columns', 'mentioned_values',
-                                                                              'query_template', 'source', 'labels',
-                                                                              'token_types'])
-            df_template.to_csv('../dataset/my_new_last_data_final/' + each, index=False)
-    
     ### Part 2
 
     def extract_db_information(self):
@@ -514,7 +372,7 @@ class ProcessData4Training(object):
 
         df = pd.DataFrame(data=result, columns=['table', 'column', 'value'])
 
-        df.to_csv('../c_dataset/database_information.csv', index=False)
+        df.to_csv('../dataset/database_information.csv', index=False)
 
 if __name__ == "__main__":
     start_time = time.time()
@@ -539,42 +397,41 @@ if __name__ == "__main__":
             col_val_map = DataProcesser.get_values_in_columns(db, table, cols, conditions='remove')
             finding_map[db][table] = col_val_map
     
-    # for each in ['train.csv', 'dev.csv', 'test.csv']:
-    #     df = pd.read_csv('../dataset/' + each)
+    for each in ['train.csv', 'dev.csv', 'test.csv']:
+        df = pd.read_csv('D:/axxwd/SIGN2VIS/nvBench/My_data/' + each)
 
-        # for index, row in df.iterrows():
-        #     db_id = row['db_id']
-        #     vega_zero_list = row['vega_zero'].split(' ')
-        #     # print(row['vega_zero'])
-        #     st_id = vega_zero_list.index('data') + 1
-        #     ed_id = None
-        #     for j in range(len(vega_zero_list) - st_id):
-        #         if vega_zero_list[st_id + j] == 'encoding':
-        #             ed_id = st_id + j
-        #     if len(vega_zero_list[st_id:ed_id]) == 1:
-        #         continue
+        for index, row in df.iterrows():
+            db_id = row['db_id']
+            vega_zero_list = row['vega_zero'].split(' ')
+            # print(row['vega_zero'])
+            st_id = vega_zero_list.index('data') + 1
+            ed_id = None
+            for j in range(len(vega_zero_list) - st_id):
+                if vega_zero_list[st_id + j] == 'encoding':
+                    ed_id = st_id + j
+            if len(vega_zero_list[st_id:ed_id]) == 1:
+                continue
 
-        #     table_name = ' '.join(vega_zero_list[st_id:ed_id])
-        #     connection = sqlite3.connect('../dataset/database' + '/' + db_id + '/' + db_id + '.sqlite')
-        #     cursor = connection.execute('select * from ' + table_name)
-        #     columns_list = list(map(lambda x: x[0].lower(), cursor.description))
+            table_name = ' '.join(vega_zero_list[st_id:ed_id])
+            connection = sqlite3.connect('../dataset/database' + '/' + db_id + '/' + db_id + '.sqlite')
+            cursor = connection.execute('select * from ' + table_name)
+            columns_list = list(map(lambda x: x[0].lower(), cursor.description))
 
-        #     col_val_map = DataProcesser.get_values_in_columns(db_id, table_name, columns_list, conditions='remove')
-        #     finding_map[db_id][table_name] = col_val_map
+            col_val_map = DataProcesser.get_values_in_columns(db_id, table_name, columns_list, conditions='remove')
+            finding_map[db_id][table_name] = col_val_map
+
 
 
     print('build db-table-column-distinctValue dictionary  end ... ...')
 
     # process the benchmark dataset for training&testing
     print('process the benchmark dataset for training&testing  start ... ...')
-    # DataProcesser.process4training()
-    DataProcesser.process3training()
-    # DataProcesser.process_test()
+    DataProcesser.process4training()
     print('process the benchmark dataset for training&testing  end ... ...')
 
     # build 'database_information.csv'
-    # print("build 'database_information.csv'  start ... ...")
-    # DataProcesser.extract_db_information()
-    # print("build 'database_information.csv'  end ... ...")
+    print("build 'database_information.csv'  start ... ...")
+    DataProcesser.extract_db_information()
+    print("build 'database_information.csv'  end ... ...")
 
-    # print("\n {0} minutes for processing the dataset.".format(round((time.time()-start_time)/60,2)))
+    print("\n {0} minutes for processing the dataset.".format(round((time.time()-start_time)/60,2)))
